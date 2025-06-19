@@ -34,8 +34,9 @@ class Signal:
 
 # signal = sine_1hz + sine_10hz + sine_20hz + sine_39hz
 
-sampling_rate = 256.0
-duration = 2
+
+sampling_rate = 30.0
+duration = 100
 
 sig1 = Signal(amplitude=4, frequency=3, phase=20*np.pi/180, sampling_rate=int(sampling_rate), duration=duration)
 sig2 = Signal(amplitude=1, frequency=10, phase=37*np.pi/180, sampling_rate=int(sampling_rate), duration=duration)
@@ -44,7 +45,15 @@ sig2 = Signal(amplitude=1, frequency=10, phase=37*np.pi/180, sampling_rate=int(s
 sig5 = Signal(amplitude=2, frequency=120, phase=82*np.pi/180, sampling_rate=int(sampling_rate), duration=duration)
 
 # signal = sig1.sine() + sig2.sine() + sig3.sine() + sig4.sine() + sig5.sine()
-signal = sig1.sine() + sig2.sine() + sig5.sine()
+# signal = sig1.sine() + sig2.sine() + sig5.sine()
+
+siga = Signal(amplitude=1, frequency=1, phase=1.5, sampling_rate=int(sampling_rate), duration=duration)
+sigb = Signal(amplitude=3, frequency=2, phase=np.pi/7, sampling_rate=int(sampling_rate), duration=duration)
+sigc= Signal(amplitude=1, frequency=5, phase=3*np.pi/5, sampling_rate=int(sampling_rate), duration=duration)
+sigd = Signal(amplitude=1, frequency=0.5, phase=0, sampling_rate=int(sampling_rate), duration=duration)
+sige = Signal(amplitude=1, frequency=1, phase=0, sampling_rate=int(sampling_rate), duration=duration)
+
+signal = siga.sine() + sigb.sine() + sigc.sine() + sigd.cosine() + sige.cosine()
 
 with open("signal.txt", "w") as f:
     for val in signal:
@@ -52,53 +61,97 @@ with open("signal.txt", "w") as f:
         imag_str += str(np.imag(val))
         f.write(str(np.real(val)) + imag_str + "j\n")
 
-fig, axs = plt.subplots(nrows=2, ncols=2)
-fig.suptitle("Signal and FFT")
-
-timearray = [x/sampling_rate for x in range(0, len(signal))]
-
-axs[0,0].plot(timearray, signal, "b")
-axs[0,0].set(xlabel="Time [sec]", ylabel="Amplitude")
-axs[0,0].set_title("Input signal")
+fig, axs = plt.subplots(nrows=2, ncols=1)
+fig.suptitle("Real and Imaginary Components of Fourier Transform")
 
 N = len(signal)
 fourier = np.fft.rfft(signal)
 
 threshold = max(np.abs(fourier))/10000
-thresholded_fourier = [(x if abs(x) > threshold else 0) for x in fourier]
+thresholded_fourier = np.array([(x if abs(x) > threshold else 0) for x in fourier])
+norm_fourier = 2*thresholded_fourier/N
 
-# print(fourier)
+
 frequency_axis = np.fft.rfftfreq(N, d=1.0/sampling_rate)
-norm_amplitude = 2*np.abs(thresholded_fourier)/N
+cos_amplitude = norm_fourier.real
+sin_amplitude = -norm_fourier.imag # this needs to be negative as e^-itheta is -isintheta, so needs to be negated
+print(sin_amplitude)
 
-phase = [(x+90 if x != 0 else 0) for x in np.angle(thresholded_fourier, deg=True)]
-
-axs[1,0].plot(frequency_axis, norm_amplitude)
-axs[1,0].set(xlabel="Frequency[Hz]", ylabel="Amplitude")
-axs[1,0].set_title("Spectrum")
-
-axs[0,1].plot(frequency_axis, phase)
-axs[0,1].set(xlabel="Frequency[Hz]", ylabel="Phase shift of waves (degrees)")
-axs[0,1].set_title("Phase")
-
-resignal = np.array([0.0 for _ in range(int(sampling_rate*duration))])
-for i in range(len(thresholded_fourier)):
-    if thresholded_fourier[i] == 0:
-        continue
-
-    amp = 2*abs(thresholded_fourier[i])/N
-    phase = np.angle(thresholded_fourier[i], deg=True) + 90
-    freq = frequency_axis[i]
-    print(f"Found signal with amplitude {amp}, phase {phase} and frequency {freq}")
-    if freq > 100:
-        continue
-    else:
-        sig = Signal(amplitude=amp, frequency=freq, phase=(((phase-90)*np.pi/180)+np.pi/2), sampling_rate=sampling_rate, duration=duration)
-        resignal += sig.sine()
+for f, t in zip(frequency_axis, norm_fourier):
+    print(f, t)
 
 
-axs[1,1].plot(timearray, resignal, "b")
-axs[1,1].set(xlabel="Time [sec]", ylabel="Amplitude")
-axs[1,1].set_title("Reverse engineered signal")
+axs[0].plot(frequency_axis, cos_amplitude, color='red')
+axs[0].set(xlabel="Frequency[Hz]", ylabel="Amplitude")
+axs[0].set_title("Amplitude of real component (cos)")
+axs[0].set_xlim(0, 7)
+axs[0].set_ylim(-2, 4)
+for x,y in zip(frequency_axis, cos_amplitude):
+    if abs(y) > 0:
+        axs[0].annotate(f'({x:.2f}, {y:.2f})', (x, y), textcoords="offset points", xytext=(0,10), ha='center')
+
+axs[1].plot(frequency_axis, sin_amplitude, color='blue')
+axs[1].set(xlabel="Frequency[Hz]", ylabel="Amplitude")
+axs[1].set_title("Amplitude of imaginary component (sin)")
+axs[1].set_xlim(0, 7)
+axs[1].set_ylim(-2, 4)
+
+for x,y in zip(frequency_axis, sin_amplitude):
+    if abs(y) > 0:
+        if y < 0:
+            axs[1].annotate(f'({x:.2f}, {y:.2f})', (x, y-0.5), textcoords="offset points", xytext=(0,10), ha='center')
+        else:
+            axs[1].annotate(f'({x:.2f}, {y:.2f})', (x, y), textcoords="offset points", xytext=(0,10), ha='center')
 
 plt.show()
+
+# fig, axs = plt.subplots(nrows=2, ncols=2)
+# fig.suptitle("Signal and FFT")
+
+# timearray = [x/sampling_rate for x in range(0, len(signal))]
+
+# axs[0,0].plot(timearray, signal, "b")
+# axs[0,0].set(xlabel="Time [sec]", ylabel="Amplitude")
+# axs[0,0].set_title("Input signal")
+
+# N = len(signal)
+# fourier = np.fft.rfft(signal)
+
+# threshold = max(np.abs(fourier))/10000
+# thresholded_fourier = [(x if abs(x) > threshold else 0) for x in fourier]
+
+# # print(fourier)
+# frequency_axis = np.fft.rfftfreq(N, d=1.0/sampling_rate)
+# norm_amplitude = 2*np.abs(thresholded_fourier)/N
+
+# phase = [(x+90 if x != 0 else 0) for x in np.angle(thresholded_fourier, deg=True)]
+
+# axs[1,0].plot(frequency_axis, norm_amplitude)
+# axs[1,0].set(xlabel="Frequency[Hz]", ylabel="Amplitude")
+# axs[1,0].set_title("Spectrum")
+
+# axs[0,1].plot(frequency_axis, phase)
+# axs[0,1].set(xlabel="Frequency[Hz]", ylabel="Phase shift of waves (degrees)")
+# axs[0,1].set_title("Phase")
+
+# resignal = np.array([0.0 for _ in range(int(sampling_rate*duration))])
+# for i in range(len(thresholded_fourier)):
+#     if thresholded_fourier[i] == 0:
+#         continue
+
+#     amp = 2*abs(thresholded_fourier[i])/N
+#     phase = np.angle(thresholded_fourier[i], deg=True) + 90
+#     freq = frequency_axis[i]
+#     print(f"Found signal with amplitude {amp}, phase {phase} and frequency {freq}")
+#     if freq > 100:
+#         continue
+#     else:
+#         sig = Signal(amplitude=amp, frequency=freq, phase=(((phase-90)*np.pi/180)+np.pi/2), sampling_rate=sampling_rate, duration=duration)
+#         resignal += sig.sine()
+
+
+# axs[1,1].plot(timearray, resignal, "b")
+# axs[1,1].set(xlabel="Time [sec]", ylabel="Amplitude")
+# axs[1,1].set_title("Reverse engineered signal")
+
+# plt.show()
